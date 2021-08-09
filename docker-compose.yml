@@ -1,0 +1,49 @@
+version: '3'
+services:
+  postgres:
+    image: postgres:10
+    container_name: airflow-db
+    environment:
+      - POSTGRES_USER=${AIRFLOW_DB_USER:-airflow}
+      - POSTGRES_PASSWORD=${AIRFLOW_DB_PASSWORD:-airflow}
+      - POSTGRES_DB=${AIRFLOW_DB:-airflow}
+    ports:
+      - ${AIRFLOW_DB_EXT_PORT:-5444}:5432
+    volumes:
+      - '${AIRFLOW_DB_DATA_PATH:-./.pgdata}:/var/lib/postgresql/data'
+
+  mssql:
+    image: microsoft/mssql-server-linux:latest
+    container_name: airflow-mssql
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=Th1sS3cret!
+    ports:
+      - 1444:1433
+
+  airflow:
+    image: laudio/airflow-mssql:1.0.5
+    container_name: airflow
+    restart: always
+    depends_on:
+      - postgres
+      - mssql
+    environment:
+      - LOAD_EX=n
+      - EXECUTOR=Local
+      - FERNET_KEY=${FERNET_KEY}
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW__CORE__FERNET_KEY}
+      - PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/mssql-tools/bin:/usr/local/airflow/.local/bin
+
+    volumes:
+      - ~/.ssh:/usr/local/airflow/.ssh
+      - ./src/dags:/usr/local/airflow/dags
+      - ./src/etl:/usr/local/airflow/etl
+      - ./src/sql:/usr/local/airflow/sql
+      - ./src/scripts:/usr/local/airflow/scripts
+      - ./src/config/airflow.cfg:/usr/local/airflow/airflow.cfg
+      - ./data:/usr/local/airflow/data
+    ports:
+      - ${AIRFLOW_WEB_EXT_PORT:-8081}:8080
+    command: webserver
+
